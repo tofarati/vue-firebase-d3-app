@@ -1,40 +1,40 @@
 <template>
   <div class="charts">
-    <div><svg id="bloodGroupChart" :width="width" :height="height"></svg></div>
-    
-    <div><svg id="ageRangesChart" :width="width" :height="height"></svg></div>
+    <div id="bloodGroupChart"></div>
+    <div id="ageRangesChart"></div>
   </div>
 </template>
 
 <script>
-import d3 from 'd3';
+import * as d3 from 'd3';
 export default {
   name: 'Charts',
   props: {
     patients: {
       type: Array,
-      validator: (patient) => patient.every(x => typeof x === 'object')
+      validator: (patient) => patient.every(x => typeof x === 'object'),
+      required: true
     }
   },
   data: ()=> {
     return {
-      width: 750,
-      height: 400,
-      margin: 200,
+      width: 360,
+      height: 280,
+      margin: {top: 50, right: 50, bottom: 50, left: 50}
     }
   },
   computed: {
-    scaleWidth: () => this.width-this.margin,
-    scaleHeight: () => this.height-this.margin,
-    groupCounts: () => {
+    groupCounts(){
       let groupCounts = {};
       this.patients.map(patient => {
         groupCounts[patient.bloodgroup] = groupCounts[patient.bloodgroup] + 1 || 1;  
       })
       return groupCounts;
     },
-    bloodGroups: () => this.groupCounts.keys(),
-    ageRanges: () => {
+    bloodGroups(){
+      return Object.keys(this.groupCounts)
+    },
+    ageRanges(){
       let ageRanges = {};
       this.patients.map(patient => {
         if(patient.age < 18){
@@ -49,116 +49,136 @@ export default {
       })
       return ageRanges;
     },
-    ageGroups: () => this.ageRanges.keys()
+    ageGroups(){
+      return Object.keys(this.ageRanges)
+    }
   },
   methods: {
     initBloodGroupChart(){
-      var svg = d3
-      .select("#bloodGroupChart");
+      var width = this.width - this.margin.left - this.margin.right,
+      height = this.height - this.margin.top - this.margin.bottom,
+      margin = this.margin;
 
-      svg.append("text")
-      .attr("transform", "translate(100,0)")
-      .attr("x", 50)
-      .attr("y", 50)
-      .attr("font-size", "24px")
-      .text("Distribution of Blood Groups");
 
-      var xScale = d3.scaleBand()
-      .domain(this.bloodGroups)
-      .range([0, this.scaleWidth])
-      .padding(0.4),
-      yScale = d3.scaleLinear()
-      .domain([0, d3.max(this.groupCounts.values()])
-      .range([this.scaleHeight, 0]);
+      var x = d3.scaleBand()
+      .range([0, width])
+      .padding(0.1);
+      var y = d3.scaleLinear()
+      .range([height, 0]);
+          
+      var svg = d3.select("#bloodGroupChart")
+      .append("svg")
+      .attr("width", width + margin.left + margin.right)
+      .attr("height", height + margin.top + margin.bottom)
+      .style("border", "3px solid black")
+      .append("g")
+      .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+      
+      var data = [...this.bloodGroups].map((group)=>{
+        return {bloodgroup: group, count: this.groupCounts[group]};
+      });
 
-      var g = svg.append("g")
-      .attr("transform", "translate(" + 100 + "," + 100 + ")");
+      x.domain(data.map(function(d) { return d.bloodgroup; }));
+      y.domain([0, d3.max(data, function(d) { return d.count; })]);
 
-      g.append("g")
-      .attr("transform", "translate(0," + this.height + ")")
-      .call(d3.axisBottom(xScale))
+      svg.selectAll(".bar")
+      .data(data)
+      .enter().append("rect")
+      .style("fill", "steelblue")
+      .attr("x", function(d) { return x(d.bloodgroup); })
+      .attr("width", x.bandwidth())
+      .attr("y", function(d) { return y(d.count); })
+      .attr("height", function(d) { return height - y(d.count); });
+
+      svg.append("g")
+      .attr("transform", "translate(0," + height + ")")
+      .call(d3.axisBottom(x))
       .append("text")
-      .attr("y", this.height - 250)
-      .attr("x", this.width - 100)
+      .attr("y", height - 150)
+      .attr("x", width - 100)
       .attr("text-anchor", "end")
       .attr("stroke", "black")
       .text("Blood Group");
 
-      g.append("g")
-      .call(d3.axisLeft(yScale).tickFormat(function(d){
-          return d;
-      })
-      .ticks(10))
+      svg.append("g")
+      .call(d3.axisLeft(y))
       .append("text")
       .attr("transform", "rotate(-90)")
       .attr("y", 6)
-      .attr("dy", "-5.1em")
+      .attr("dy", "-3.1em")
       .attr("text-anchor", "end")
       .attr("stroke", "black")
-      .text("Number of Patients"); 
-
-      g.selectAll(".bar")
-      .data(this.bloodGroups)
-      .enter().append("rect")
-      .attr("class", "bar")
-      .attr("x", function(d) {
-      return xScale(d) })
-      .attr("y", function(d) { return yScale(this.groupCounts[d]) })
-      .attr("height", function(d) { return height - yScale(this.groupCounts[d]) });  
-    },
-    initAgeRangesChart(){
-      var svg = d3
-      .select("#ageRangesChart");
+      .text("Number of Patients with Blood Group");
 
       svg.append("text")
-      .attr("transform", "translate(100,0)")
-      .attr("x", 50)
-      .attr("y", 50)
-      .attr("font-size", "24px")
-      .text("Age Distributions");
+      .attr("transform", "translate(80,-10)")
+      .attr("x", 0)
+      .attr("y", 0)
+      .attr("font-size", "20px")
+      .text("Blood Groups");
+    },
+    initAgeRangesChart(){
+      var width = this.width - this.margin.left - this.margin.right,
+      height = this.height - this.margin.top - this.margin.bottom,
+      margin = this.margin;
 
-      var xScale = d3.scaleBand()
-      .domain(this.ageGroups)
-      .range([0, this.scaleWidth])
-      .padding(0.4),
-      yScale = d3.scaleLinear()
-      .domain([0, d3.max(this.ageRanges.values()])
-      .range([this.scaleHeight, 0]);
 
-      var g = svg.append("g")
-      .attr("transform", "translate(" + 100 + "," + 100 + ")");
+      var x = d3.scaleBand()
+      .range([0, width])
+      .padding(0.1);
+      var y = d3.scaleLinear()
+      .range([height, 0]);
+          
+      var svg = d3.select("#ageRangesChart")
+      .append("svg")
+      .attr("width", width + margin.left + margin.right)
+      .attr("height", height + margin.top + margin.bottom)
+      .style("border", "3px solid black")
+      .append("g")
+      .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+      
+      var data = [...this.ageGroups].map((group)=>{
+        return {agerange: group, count: this.ageRanges[group]};
+      });
 
-      g.append("g")
-      .attr("transform", "translate(0," + this.height + ")")
-      .call(d3.axisBottom(xScale))
+      x.domain(data.map(function(d) { return d.agerange; }));
+      y.domain([0, d3.max(data, function(d) { return d.count; })]);
+
+      svg.selectAll(".bar")
+      .data(data)
+      .enter().append("rect")
+      .style("fill", "steelblue")
+      .attr("x", function(d) { return x(d.agerange); })
+      .attr("width", x.bandwidth())
+      .attr("y", function(d) { return y(d.count); })
+      .attr("height", function(d) { return height - y(d.count); });
+
+      svg.append("g")
+      .attr("transform", "translate(0," + height + ")")
+      .call(d3.axisBottom(x))
       .append("text")
-      .attr("y", this.height - 250)
-      .attr("x", this.width - 100)
+      .attr("y", height - 150)
+      .attr("x", width - 100)
       .attr("text-anchor", "end")
       .attr("stroke", "black")
-      .text("Age Group");
+      .text("Age Range");
 
-      g.append("g")
-      .call(d3.axisLeft(yScale).tickFormat(function(d){
-          return d;
-      })
-      .ticks(10))
+      svg.append("g")
+      .call(d3.axisLeft(y))
       .append("text")
       .attr("transform", "rotate(-90)")
       .attr("y", 6)
-      .attr("dy", "-5.1em")
+      .attr("dy", "-3.1em")
       .attr("text-anchor", "end")
       .attr("stroke", "black")
-      .text("Number of Patients in Group"); 
+      .text("Number of Patients in Age Range");
 
-      g.selectAll(".bar")
-      .data(this.ageRanges)
-      .enter().append("rect")
-      .attr("class", "bar")
-      .attr("x", function(d) {
-      return xScale(d); })
-      .attr("y", function(d) { return yScale(this.groupCounts[d]); })
-      .attr("height", function(d) { return height - yScale(this.groupCounts[d]); });  
+      svg.append("text")
+      .attr("transform", "translate(80,-10)")
+      .attr("x", 0)
+      .attr("y", 0)
+      .attr("font-size", "20px")
+      .text("Age Distribution");
     }
   },
   mounted(){
@@ -169,5 +189,4 @@ export default {
 </script>
 
 <style scoped>
-
 </style>

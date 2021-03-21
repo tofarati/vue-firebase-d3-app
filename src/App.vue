@@ -1,9 +1,9 @@
 <template>
   <main>
-    <div class="offline" v-show="offline">
+    <div class="offline" v-if="offline">
     <span>You are currently offline</span>
     </div>
-    <Charts patients="patients"/>
+    <Charts v-if="patients.length" :patients="patients"/>
   </main>
 </template>
 
@@ -22,55 +22,48 @@ export default {
     return {
       patients: [],
       offline: false,
-      collection: "frontend-vuejs-assignment-default-rtdb",
-      dataPollInterval: null,
-      connectedRef: null
+      pollInterval: null,
+      patientsRef: db.ref('/'), 
+      connectedRef: firebase.database().ref('.info/connected')      
     }
   },
   methods: {
-    readPatientData() {
+    readPatientData(data) {
       let patientData = [];
-      db.collection(this.collection)
-        .get()
-        .then((snapshot) => {
-          snapshot.forEach((patient) => {
-            patientData.push({
-              id: patient.id,
-              name: patient.name,
-              age: patient.age,
-              bloodgroup: patient.bloodgroup
-            });
-          });
-
-          localStorage.setItem('patients', patientData);
-        })
-        .catch((error)=>{
-          console.error("Error fetching data: ", error);
+      data.forEach((patient) => {
+        patientData.push({
+          id: patient.id,
+          name: patient.name,
+          age: patient.age,
+          bloodgroup: patient.bloodgroup
         });
-      patientData = localStorage.getItem('patients');
-      if(patientData) {
+      });
+
+      if( localStorage.setItem('patients', JSON.stringify(patientData)) ) {
         this.patients = patientData;
-      } 
-      console.log(this.patients);
+      }
     }
   },
-  mounted(){ 
-    this.connectedRef = firebase.database().ref('.info/connected');
+  mounted(){
+    try{
+      this.patients = JSON.parse(localStorage.getItem('patients')) || []; 
+    }catch(e) {console.log(e)}
+    
     this.connectedRef.on('value', (snap) => {
-      if(snap.val() === true){
-        this.offline = false;
-      } else {
+      if(!snap.val()){
         this.offline = true;
+      } else {
+        this.offline = false;
       }
-    }) 
-    this.readPatientData();
-    //  If the data was expected to update every 5 minutes:
-    //  this.dataPollInterval = setInterval(() => {
-    //   this.readPatientData();
-    // }.bind(this), 1000*60*5);
+    }).bind(this); 
+    this.patientsRef.on('value', (snapshot) => {
+      this.offline = false; 
+      const data = snapshot.val();
+      this.readPatientData(data);
+    }).bind(this);
   },
   beforeUnmount(){
-    clearInterval(this.dataPollInterval);
+    clearInterval(this.pollInterval)
   }
 }
 </script>
