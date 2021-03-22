@@ -1,4 +1,6 @@
-# frontend-vuejs-assignment
+# Vue Firebase D3 App
+
+Demo: https://vue-firebase-d3.netlify.app/
 
 ## Project setup
 ```
